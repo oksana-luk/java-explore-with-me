@@ -13,26 +13,26 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name="hits")
+@Table(name = "hits")
 public class HitDto {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
     @NotBlank(message = "App should not be empty")
-    @Column(name="app")
+    @Column(name = "app")
     private String app;
 
     @NotBlank(message = "Uri should not be empty")
-    @Column(name="uri")
+    @Column(name = "uri")
     private String uri;
 
     @NotBlank(message = "Ip should not be empty")
-    @Column(name="ip")
+    @Column(name = "ip")
     private String ip;
 
     @NotNull(message = "Timestamp should not be empty")
-    @Column(name="timestamp_value")
+    @Column(name = "timestamp_value")
     private LocalDateTime timestamp;
 
     @Override
