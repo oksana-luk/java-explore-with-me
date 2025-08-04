@@ -21,7 +21,6 @@ logging.level.org.hibernate:
   jdbc.bind: TRACE
 
 spring.datasource:
-  initialization-mode: always
   driver-class-name: org.postgresql.Driver
   url: jdbc:postgresql://stats-db:5432/stats
   username: stats
