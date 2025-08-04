@@ -45,7 +45,7 @@ public class StatsService {
     public void validateEventUri(String uri) {
         if (!EVENT_URI_PATTERN.matcher(uri).matches()) {
             throw new ValidationException("Parameter uri is invalid.");
-        };
+        }
     }
 
     public void validateDates(LocalDateTime start, LocalDateTime end) {
