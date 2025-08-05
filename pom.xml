@@ -11,8 +11,15 @@
 	</parent>
 
 	<name>Explore With Me</name>
+    <modules>
+        <module>stats-service</module>
+		<module>explore-service</module>
+		<module>stats-service/client</module>
+		<module>stats-service/service</module>
+		<module>stats-service/dto</module>
+	</modules>
 
-	<groupId>ru.practicum</groupId>
+    <groupId>ru.practicum</groupId>
 	<artifactId>explore-with-me</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>pom</packaging>
@@ -183,5 +190,13 @@
 			</build>
 		</profile>
 	</profiles>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+	</dependencies>
 
 </project>
