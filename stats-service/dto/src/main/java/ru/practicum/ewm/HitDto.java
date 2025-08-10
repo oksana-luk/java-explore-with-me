@@ -1,10 +1,9 @@
 package ru.practicum.ewm;
 
-import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import com.fasterxml.jackson.annotation.JsonFormat;
 
 import java.time.LocalDateTime;
 
@@ -13,28 +12,20 @@ import java.time.LocalDateTime;
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor
-@Entity
-@Table(name = "hits")
 public class HitDto {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
     @NotBlank(message = "App should not be empty")
-    @Column(name = "app")
     private String app;
 
     @NotBlank(message = "Uri should not be empty")
-    @Column(name = "uri")
     private String uri;
 
     @NotBlank(message = "Ip should not be empty")
-    @Column(name = "ip")
     private String ip;
 
     @NotNull(message = "Timestamp should not be empty")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @Column(name = "timestamp_value")
     private LocalDateTime timestamp;
 
     @Override

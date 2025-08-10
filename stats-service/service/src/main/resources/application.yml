@@ -16,12 +16,12 @@ logging.level.org.springframework:
 
 logging.level.org.hibernate:
   SQL: DEBUG
-  type: TRACE
   jdbc.bind: TRACE
 
 spring.datasource:
   driver-class-name: org.postgresql.Driver
   url: jdbc:postgresql://stats-db:5432/stats
+#  url: jdbc:postgresql://localhost:5431/stats
   username: stats
   password: 12345
 

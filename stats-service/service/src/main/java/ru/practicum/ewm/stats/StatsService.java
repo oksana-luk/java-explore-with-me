@@ -16,26 +16,32 @@ import java.util.Objects;
 @Transactional(readOnly = true)
 public class StatsService {
     private final StatsRepository statsRepository;
+    private final HitMapper hitMapper;
+    private final StatsMapper statsMapper;
 
     public List<StatsDto> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
         validateDates(start, end);
+        List<Stats> result;
         boolean hasUris = !(Objects.isNull(uris) || uris.isEmpty());
         if (hasUris) {
             if (unique) {
-                return statsRepository.findStatsByUriUniqueIp(start, end, uris);
+                result = statsRepository.findStatsByUriUniqueIp(start, end, uris);
             } else {
-                return statsRepository.findStatsByUri(start, end, uris);
+                result = statsRepository.findStatsByUri(start, end, uris);
             }
         } else if (unique) {
-            return statsRepository.findStatsAllUriUniqueIp(start, end);
+            result = statsRepository.findStatsAllUriUniqueIp(start, end);
         } else {
-            return statsRepository.findStatsAllUri(start, end);
+            result = statsRepository.findStatsAllUri(start, end);
         }
+        return result.stream()
+                .map(statsMapper::mapStatsToStatsDto)
+                .toList();
     }
 
     @Transactional
     public void postHit(HitDto hitDto) {
-        statsRepository.save(hitDto);
+        statsRepository.save(hitMapper.mapHitDtoToHit(hitDto));
     }
 
     public void validateDates(LocalDateTime start, LocalDateTime end) {
