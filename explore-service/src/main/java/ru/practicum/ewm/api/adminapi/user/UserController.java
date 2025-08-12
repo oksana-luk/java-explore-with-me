@@ -45,6 +45,6 @@ public class UserController {
     public void deleteUser(@PathVariable long userId) {
         log.info("DELETE /admin/users userId={}", userId);
         userService.deleteUser(userId);
-        log.info("DELETE /admin/users result=");
+        log.info("DELETE /admin/users successfully ended, userId={}", userId);
     }
 }
