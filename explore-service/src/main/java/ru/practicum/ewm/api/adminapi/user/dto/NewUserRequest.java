@@ -15,7 +15,7 @@ public class NewUserRequest {
     private String email;
 
     @NotBlank(message = "Name should not be empty")
-    @Size(min = 2, max = 250)
+    @Size(min = 2, max = 250, message = "Name should contain from 2 to 250 characters")
     private String name;
 
     private User.Role role = User.Role.USER;

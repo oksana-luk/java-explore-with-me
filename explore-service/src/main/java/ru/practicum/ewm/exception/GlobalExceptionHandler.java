@@ -13,7 +13,6 @@ import org.springframework.web.client.HttpStatusCodeException;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -55,14 +54,13 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errors, HttpStatus.CONFLICT);
     }
 
-    //kommt aus HTTP Client module
     @ExceptionHandler(ValidationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ResponseEntity<Map<String, String>> handleCustomValidationException(ValidationException ex) {
-        Map<String, String> errors = new HashMap<>();
-        errors.put("error", ex.getMessage());
+        Map<String, String> errors = getErrorDescription(HttpStatus.BAD_REQUEST,
+                "Incorrectly made request",
+                ex.getMessage());
         log.warn("Handling (custom) Validation Exception, e.message={}", ex.getMessage());
-
         return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
     }
 
@@ -73,13 +71,14 @@ public class GlobalExceptionHandler {
         return Map.of("Validation errors", e.getMessage());
     }
 
-    //wasnt
     @ExceptionHandler
-    @ResponseStatus()
-    public ResponseEntity<Object> handleHttpStatusCodeException(HttpStatusCodeException ex) {
-        ResponseEntity.BodyBuilder builder = ResponseEntity.status(ex.getStatusCode());
-        log.warn("Handling HttpStatusCodeException, e.code={}, body={}", ex.getStatusCode(), builder.body(ex.getResponseBodyAsByteArray()));
-        return ResponseEntity.status(ex.getStatusCode()).body(ex.getResponseBodyAsByteArray());
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ResponseEntity<Map<String, String>> handleHttpStatusCodeException(HttpStatusCodeException ex) {
+        Map<String, String> errors = getErrorDescription(HttpStatus.BAD_REQUEST,
+                "Internal server error",
+                ex.getMessage());
+        log.warn("Handling HttpStatusCodeException, code={}, message={}", ex.getStatusCode(), ex.getMessage());
+        return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

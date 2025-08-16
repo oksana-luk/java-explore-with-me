@@ -13,6 +13,6 @@ import lombok.ToString;
 @NoArgsConstructor
 public class CategoryRequest {
     @NotBlank(message = "Name should not be empty")
-    @Size(max = 50)
+    @Size(min = 1, max = 50, message = "Name should contain from 1 to 50 characters")
     private String name;
 }
