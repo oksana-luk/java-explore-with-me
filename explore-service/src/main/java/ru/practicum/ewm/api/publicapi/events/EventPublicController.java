@@ -5,7 +5,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -37,9 +36,9 @@ public class EventPublicController {
     @GetMapping("/{eventId}")
     @ResponseStatus(HttpStatus.OK)
     public EventFullDto getEvent(@PathVariable long eventId, HttpServletRequest request) {
-        log.info("GET /events/{}", eventId);
+        log.info("GET /events/{eventId} eventId={}", eventId);
         EventFullDto event = eventPublicService.getEvent(eventId, request);
-        log.info("GET /events/{} result={}", eventId, event);
+        log.info("GET /events/{eventId} result={}", event);
         return event;
     }
 }

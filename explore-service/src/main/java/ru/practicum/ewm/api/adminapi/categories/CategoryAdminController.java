@@ -12,8 +12,8 @@ import ru.practicum.ewm.api.adminapi.categories.dto.CategoryRequest;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/admin/categories")
-public class CategoryController {
-    private final CategoryService categoryService;
+public class CategoryAdminController {
+    private final CategoryAdminService categoryService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -27,17 +27,17 @@ public class CategoryController {
     @DeleteMapping("/{categoryId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCategory(@PathVariable long categoryId) {
-        log.info("DELETE /admin/categories categoryId={}", categoryId);
+        log.info("DELETE /admin/categories/{categoryId} categoryId={}", categoryId);
         categoryService.deleteCategory(categoryId);
-        log.info("DELETE /admin/categories successfully ended, categoryId={}", categoryId);
+        log.info("DELETE /admin/categories{categoryId} successfully ended, categoryId={}", categoryId);
     }
 
     @PatchMapping("/{categoryId}")
     public CategoryDto updateCategory(@Valid @RequestBody CategoryRequest updateCategoryRequest,
                                       @PathVariable long categoryId) {
-        log.info("PATCH /admin/categories updateCategoryRequest={}", updateCategoryRequest);
+        log.info("PATCH /admin/categories/{categoryId} updateCategoryRequest={}", updateCategoryRequest);
         CategoryDto categoryDto = categoryService.updateCategory(updateCategoryRequest, categoryId);
-        log.info("PATCH /admin/categories result={}", categoryDto);
+        log.info("PATCH /admin/categories/{categoryId} result={}", categoryDto);
         return categoryDto;
     }
 }

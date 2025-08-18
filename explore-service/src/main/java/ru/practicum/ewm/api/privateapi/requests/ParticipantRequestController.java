@@ -20,16 +20,16 @@ public class ParticipantRequestController {
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     public List<ParticipantRequestDto> getRequests(@PathVariable long userId) {
-        log.info("GET /users/{userId}/requests/ userId={}", userId);
+        log.info("GET /users/{userId}/requests userId={}", userId);
         List<ParticipantRequestDto> requestDtos = requestService.getRequests(userId);
-        log.info("GET /admin/requestDtos result={}", requestDtos);
+        log.info("GET /users/{userId}/requests result={}", requestDtos);
         return requestDtos;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ParticipantRequestDto addRequest(@PathVariable long userId,
-                                            @RequestParam(name = "eventId", required = true) long eventId) {
+                                            @RequestParam(name = "eventId") long eventId) {
         log.info("POST /users/{userId}/requests userId={}, eventId={}", userId, eventId);
         ParticipantRequestDto requestDto = requestService.addRequest(userId, eventId);
         log.info("POST /users/{userId}/requests result={}", requestDto);

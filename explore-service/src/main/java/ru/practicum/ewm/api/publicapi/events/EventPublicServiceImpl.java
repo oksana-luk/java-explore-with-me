@@ -10,7 +10,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.ewm.api.adminapi.categories.CategoryRepository;
 import ru.practicum.ewm.api.privateapi.events.EventMapper;
 import ru.practicum.ewm.api.privateapi.events.EventRepository;
 import ru.practicum.ewm.api.privateapi.events.dto.EventFullDto;
@@ -23,10 +22,7 @@ import ru.practicum.ewm.exception.ValidationException;
 import ru.practicum.ewm.statistic.StatisticService;
 
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -34,7 +30,6 @@ import java.util.Objects;
 @Transactional(readOnly = true)
 public class EventPublicServiceImpl implements EventPublicService {
     private final EventRepository eventRepository;
-    private final CategoryRepository categoryRepository;
     private final StatisticService statisticService;
     private final ParticipantRequestService requestService;
     private final EventMapper eventMapper;
@@ -45,7 +40,7 @@ public class EventPublicServiceImpl implements EventPublicService {
 
         Specification<Event> specification = getEventSpecification(filterRequest);
 
-        Sort sort= Sort.by(Sort.Direction.ASC, "eventDate");
+        Sort sort = Sort.by(Sort.Direction.ASC, "eventDate");
         PageRequest page  = PageRequest.of(from > 0 ? from / size : 0, size, sort);
         log.info("Event public service, getting events: page={}, sort={}", page, sort);
 
@@ -54,6 +49,7 @@ public class EventPublicServiceImpl implements EventPublicService {
 
         Map<Long, Long> statistic = statisticService.getStatsByEvents(events, false);
         Map<Long, Integer> confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(events);
+        log.info("Event public service, getting events: statistic={}, confirmedRequests={}", statistic, confirmedRequests);
 
         List<EventShortDto> result = events.stream()
                 .map(event -> eventMapper.mapEventToEventShortDto(
@@ -78,8 +74,12 @@ public class EventPublicServiceImpl implements EventPublicService {
 
         statisticService.saveHit(request.getRequestURI(), request.getRemoteAddr());
 
-        Map<Long, Long> statistic = statisticService.getStatsByEvents(List.of(event), false);
-        Map<Long, Integer> confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
+        Map<Long, Long> statistic = statisticService.getStatsByEvents(List.of(event), true);
+        Map<Long, Integer> confirmedRequests = new HashMap<>();
+        if (event.isRequestModeration()) {
+            confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
+        }
+        log.info("Event public service, getting event: statistic={}, confirmedRequests={}", statistic, confirmedRequests);
 
         return eventMapper.mapEventToEventFullDto(
                 event,
@@ -122,6 +122,7 @@ public class EventPublicServiceImpl implements EventPublicService {
         }
         if (Objects.nonNull(filterRequest.getOnlyAvailable()) && filterRequest.getOnlyAvailable()) {
             specification = specification.and((root, query, cb) -> {
+                assert query != null;
                 Subquery<Long> subquery = query.subquery(Long.class);
                 Root<ParticipantRequest> requestRoot = subquery.from(ParticipantRequest.class);
                 subquery.select(cb.count(requestRoot.get("id")))

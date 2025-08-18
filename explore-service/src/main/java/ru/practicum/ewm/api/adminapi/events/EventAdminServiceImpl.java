@@ -20,6 +20,7 @@ import ru.practicum.ewm.exception.ValidationException;
 import ru.practicum.ewm.statistic.StatisticService;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,10 +45,11 @@ public class EventAdminServiceImpl implements EventAdminService {
         log.info("Event admin service, getting events: page={}", page);
 
         List<Event> events = eventRepository.findAll(specification, page).getContent();
-        log.info("Event admin service, getting events result={}", events);
+        log.info("Event admin service, getting events: result={}", events);
 
         Map<Long, Long> statistic = statisticService.getStatsByEvents(events, false);
         Map<Long, Integer> confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(events);
+        log.info("Event admin service, getting events statistic={}, confirmedRequests={}", statistic, confirmedRequests);
 
         return events.stream()
                 .map(event -> eventMapper.mapEventToEventFullDto(
@@ -61,17 +63,24 @@ public class EventAdminServiceImpl implements EventAdminService {
     @Transactional
     public EventFullDto updateEvent(UpdateEventAdminRequest updateRequest, long eventId) {
         Event event = validateEventNotFound(eventId);
+        log.info("Event admin service, updating event: event={}", event);
+
+        Category category = null;
         if (updateRequest.hasCategory()) {
-            Category category = validateCategoryNotFound(updateRequest.getCategory());
-            eventMapper.updateEventFields(event, updateRequest, category);
-        } else {
-            eventMapper.updateEventFields(event, updateRequest, null);
+            category = validateCategoryNotFound(updateRequest.getCategory());
         }
-        updatePublishedCanceledFields(updateRequest, event);
+        eventMapper.updateEventFields(event, updateRequest, category);
+
+        updateState(updateRequest, event);
         event = eventRepository.save(event);
+        log.info("Event admin service, updating event: updatedEvent={}", event);
 
         Map<Long, Long> statistic = statisticService.getStatsByEvents(List.of(event), false);
-        Map<Long, Integer> confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
+        Map<Long, Integer> confirmedRequests = new HashMap<>();
+        if (event.isRequestModeration()) {
+            confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
+        }
+        log.info("Event admin service, updating event: statistic={}, confirmedRequests={}", statistic, confirmedRequests);
 
         return eventMapper.mapEventToEventFullDto(event,
                 confirmedRequests.getOrDefault(event.getId(), 0),
@@ -107,20 +116,13 @@ public class EventAdminServiceImpl implements EventAdminService {
         return specification;
     }
 
-    private void updatePublishedCanceledFields(UpdateEventAdminRequest updateRequest, Event event) {
+    private void updateState(UpdateEventAdminRequest updateRequest, Event event) {
         if (!updateRequest.hasStateAction()) {
             return;
         }
         UpdateEventAdminRequest.StateAction stateAction = updateRequest.getStateAction();
         if (stateAction.equals(UpdateEventAdminRequest.StateAction.PUBLISH_EVENT)) {
-            if (event.getState().equals(Event.State.PUBLISHED)) {
-                throw new ActionConflictException(String.format("Cannot publish the event because it's not in the right state, current state %s",
-                        event.getState()));
-            }
-            if (event.getState().equals(Event.State.CANCELED)) {
-                throw new ActionConflictException(String.format("Cannot publish the event because it's not in the right state, current state %s",
-                        event.getState()));
-            }
+            validateEventStatePending(event);
             if (Objects.nonNull(event.getPublishedOn())) {
                 throw new ActionConflictException(String.format("Cannot publish the event because it has been published on %s",
                         event.getPublishedOn()));
@@ -133,14 +135,7 @@ public class EventAdminServiceImpl implements EventAdminService {
             event.setPublishedOn(LocalDateTime.now());
         }
         if (stateAction.equals(UpdateEventAdminRequest.StateAction.REJECT_EVENT)) {
-            if (event.getState().equals(Event.State.PUBLISHED)) {
-                throw new ActionConflictException(String.format("Cannot cancel the event because it's not in the right state, current state %s",
-                        event.getState()));
-            }
-            if (event.getState().equals(Event.State.CANCELED)) {
-                throw new ActionConflictException(String.format("Cannot cancel the event because it's not in the right state, current state %s",
-                        event.getState()));
-            }
+            validateEventStatePending(event);
             event.setState(Event.State.CANCELED);
             event.setPublishedOn(null);
         }
@@ -148,11 +143,19 @@ public class EventAdminServiceImpl implements EventAdminService {
 
     private Category validateCategoryNotFound(long categoryId) {
         return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new NotFoundException(String.format("Category with id=%s was not found", categoryId)));
+                    .orElseThrow(() -> new NotFoundException(String.format("Category with id=%s was not found",
+                            categoryId)));
     }
 
     private Event validateEventNotFound(long eventId) {
         return eventRepository.findById(eventId).orElseThrow(() ->
                 new NotFoundException(String.format("Event with id %d not found", eventId)));
+    }
+
+    private void validateEventStatePending(Event event) {
+        if (!event.getState().equals(Event.State.PENDING)) {
+            throw new ActionConflictException(String.format("Action it not available because it's not in the right state PENDING, current state %s",
+                    event.getState()));
+        }
     }
 }

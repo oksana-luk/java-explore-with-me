@@ -43,7 +43,7 @@ public class UpdateEventAdminRequest {
     private UpdateEventAdminRequest.StateAction stateAction;
 
     public enum StateAction {
-        PUBLISH_EVENT, REJECT_EVENT;
+        PUBLISH_EVENT, REJECT_EVENT
     }
 
     public boolean hasCategory() {
@@ -85,5 +85,4 @@ public class UpdateEventAdminRequest {
     public boolean hasStateAction() {
         return stateAction != null;
     }
-
 }

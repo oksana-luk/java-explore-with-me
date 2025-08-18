@@ -22,10 +22,7 @@ public interface ParticipantRequestRepository extends JpaRepository<ParticipantR
 
     List<ParticipantRequest> findAllByEventIn(List<Event> events);
 
-    List<ParticipantRequest> findAllByIdInAndStatus(Set<Long> ids, ParticipantRequest.Status status);
-
     List<ParticipantRequest> findAllByIdIn(Set<Long> ids);
 
     List<ParticipantRequest> findAllByEventInAndStatus(List<Event> events, ParticipantRequest.Status status);
-
 }

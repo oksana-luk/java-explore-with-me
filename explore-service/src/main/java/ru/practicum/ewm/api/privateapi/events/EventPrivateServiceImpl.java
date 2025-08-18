@@ -19,7 +19,6 @@ import ru.practicum.ewm.api.privateapi.requests.dto.ParticipantRequestDto;
 import ru.practicum.ewm.api.privateapi.requests.model.ParticipantRequest;
 import ru.practicum.ewm.exception.ActionConflictException;
 import ru.practicum.ewm.exception.NotFoundException;
-import ru.practicum.ewm.exception.ValidationException;
 import ru.practicum.ewm.statistic.StatisticService;
 
 import java.util.*;
@@ -45,13 +44,13 @@ public class EventPrivateServiceImpl implements EventPrivateService {
         Category category = validateCategoryNotFound(newEventRequest.getCategory());
 
         Event event = eventMapper.mapNewEventRequestToEvent(newEventRequest, initiator, category);
-        log.info("Event service add event {}", event);
+        log.info("Event private service, adding event: event={}", event);
 
         event = eventRepository.save(event);
-        log.info("Event service add event result={}", event);
+        log.info("Event private service, adding event: result={}", event);
 
         EventFullDto eventFullDto = eventMapper.mapEventToEventFullDto(event, 0, 0);
-        log.info("Event service add event eventFullDto={}", eventFullDto);
+        log.info("Event private service, adding event: eventFullDto={}", eventFullDto);
 
         return eventFullDto;
     }
@@ -60,17 +59,19 @@ public class EventPrivateServiceImpl implements EventPrivateService {
     public List<EventShortDto> getEvents(long userId, int from, int size) {
         validateUserNotFound(userId);
         PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size);
-        log.info("Event service getting events page {}", page);
+        log.info("Event private service, getting events: page={}", page);
 
         Page<Event> eventsPage = eventRepository.findAllByInitiatorId(userId, page);
         List<Event> events = eventsPage.getContent();
+        log.info("Event private service, getting events: result={}", events);
         if (events.isEmpty()) {
-            log.info("Event service getting events result={}", List.of());
             return List.of();
         }
 
         Map<Long, Long> statistic = statisticService.getStatsByEvents(events, false);
         Map<Long, Integer> confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(events);
+        log.info("Event private service, getting events: statistic={}, confirmedRequests={}",
+                statistic, confirmedRequests);
 
         return events.stream()
                 .map(event -> eventMapper.mapEventToEventShortDto(
@@ -87,7 +88,11 @@ public class EventPrivateServiceImpl implements EventPrivateService {
         log.info("Event private service, getting event by id: eventId={}", eventId);
 
         Map<Long, Long> statistic = statisticService.getStatsByEvents(List.of(event), false);
-        Map<Long, Integer> confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
+        Map<Long, Integer> confirmedRequests = new HashMap<>();
+        if (event.isRequestModeration()) {
+            confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
+        }
+        log.info("Event private service, getting event by id: statistic={}, confirmedRequests={}", statistic, confirmedRequests);
 
         return eventMapper.mapEventToEventFullDto(
                 event,
@@ -99,22 +104,26 @@ public class EventPrivateServiceImpl implements EventPrivateService {
     @Transactional
     public EventFullDto updateEvent(UpdateEventUserRequest updateRequest, long userId, long eventId) {
         Event event = validateEventNotFound(eventId);
+        log.info("Event private service, updating event: event={}", event);
+
         validateInitiator(event.getInitiator().getId(), userId, eventId);
-        if (event.getState().equals(Event.State.PUBLISHED)) {
-            throw new ActionConflictException(String.format("It is not available to change published events. Event id %s",
-                    eventId));
-        }
+        validateEventStateNotPublished(event);
+        Category category = null;
         if (updateRequest.hasCategory()) {
-            Category category = validateCategoryNotFound(updateRequest.getCategory());
-            eventMapper.updateEventFields(event, updateRequest, category);
-        } else {
-            eventMapper.updateEventFields(event, updateRequest, null);
+            category = validateCategoryNotFound(updateRequest.getCategory());
         }
-        updatePublishedCanceledFields(updateRequest, event);
+        eventMapper.updateEventFields(event, updateRequest, category);
+
+        updateState(updateRequest, event);
         event = eventRepository.save(event);
+        log.info("Event private service, updating event: updatedEvent={}", event);
 
         Map<Long, Long> statistic = statisticService.getStatsByEvents(List.of(event), false);
-        Map<Long, Integer> confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
+        Map<Long, Integer> confirmedRequests = new HashMap<>();
+        if (event.isRequestModeration()) {
+            confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
+        }
+        log.info("Event private service, updating event: statistic={}, confirmedRequests={}", statistic, confirmedRequests);
 
         return eventMapper.mapEventToEventFullDto(event,
                 confirmedRequests.getOrDefault(event.getId(), 0),
@@ -136,79 +145,84 @@ public class EventPrivateServiceImpl implements EventPrivateService {
     public EventRequestStatusUpdateResult updateRequestsByEvent(EventRequestStatusUpdateRequest updateRequest,
                                                                 long userId, long eventId) {
         Event event = validateEventNotFound(eventId);
+        log.info("Event private service, updating request by event: event={}", event);
+
         validateInitiator(event.getInitiator().getId(), userId, eventId);
-        if (event.getParticipantLimit() == 0 || !event.isRequestModeration()) {
-            throw new ActionConflictException("Request moderation is not need for event with id " + eventId);
-        }
-        if (!event.getState().equals(Event.State.PUBLISHED)) {
-            throw new ActionConflictException(String.format("""
-                                 Event with id %d is not published. Participant requests are not available""", eventId));
-        }
-        EventRequestStatusUpdateResult requestStatusUpdateResult = new EventRequestStatusUpdateResult();
+        validateRequestNeedConfirmation(event);
+        validateEventStatePublished(event);
 
         List<ParticipantRequest> requests = requestRepository.findAllByIdIn(updateRequest.getRequestIds());
 
-        requests.forEach(request -> {
-            if (!request.getStatus().equals(ParticipantRequest.Status.PENDING)) {
-                throw new ActionConflictException(String.format("Request with id %d must have status PENDING. Current status: %s",
-                        request.getId(), request.getStatus()));
-            }
-        } );
+        requests.forEach(this::validateRequestStatePending);
 
         if (updateRequest.getStatus().equals(EventRequestStatusUpdateRequest.RequestStatusAction.CONFIRMED)) {
-            Map<Long, Integer> confirmedRequestsYet = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
-            int countConfirmedYet = confirmedRequestsYet.getOrDefault(event.getId(), 0);
-            if (countConfirmedYet == event.getParticipantLimit()) {
-                throw new ActionConflictException(String.format("The participant limit for event with id %d has been reached", eventId));
-            }
-            long rest = event.getParticipantLimit() - countConfirmedYet;
-
-            if (requests.size() > rest) {
-                requests = requests.stream().limit(rest).toList();
-            }
-
-            List<ParticipantRequestDto> confirmedRequestDtos = updateAndSaveStatusByRequests(requests,
-                    ParticipantRequest.Status.CONFIRMED).stream()
-                    .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
-                    .toList();
-
-            requestStatusUpdateResult.setConfirmedRequests(confirmedRequestDtos);
-
-            List<ParticipantRequest> restOfRequests = requestRepository.findAllByEventInAndStatus(List.of(event),
-                    ParticipantRequest.Status.PENDING);
-
-            List<ParticipantRequestDto> canceledRequestDtos = updateAndSaveStatusByRequests(restOfRequests,
-                    ParticipantRequest.Status.CANCELED).stream()
-                    .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
-                    .toList();
-
-            requestStatusUpdateResult.setRejectedRequests(canceledRequestDtos);
+             return confirmRequests(event, requests);
 
         } else if (updateRequest.getStatus().equals(EventRequestStatusUpdateRequest.RequestStatusAction.REJECTED)) {
-            List<ParticipantRequestDto> canceledRequestDtos = updateAndSaveStatusByRequests(requests,
-                    ParticipantRequest.Status.CANCELED).stream()
-                    .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
-                    .toList();
-
-            requestStatusUpdateResult.setRejectedRequests(canceledRequestDtos);
+            return rejectRequests(requests);
 
         } else {
             throw new ActionConflictException("Action is not available");
         }
+    }
+
+    private EventRequestStatusUpdateResult rejectRequests(List<ParticipantRequest> requests) {
+        EventRequestStatusUpdateResult requestStatusUpdateResult = new EventRequestStatusUpdateResult();
+
+        List<ParticipantRequestDto> canceledRequestDtos = updateAndSaveStatusByRequests(requests,
+                ParticipantRequest.Status.REJECTED).stream()
+                .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
+                .toList();
+
+        requestStatusUpdateResult.setRejectedRequests(canceledRequestDtos);
         return requestStatusUpdateResult;
     }
 
-    private void updatePublishedCanceledFields(UpdateEventUserRequest updateRequest, Event event) {
+    private EventRequestStatusUpdateResult confirmRequests(Event event, List<ParticipantRequest> requests) {
+        EventRequestStatusUpdateResult requestStatusUpdateResult = new EventRequestStatusUpdateResult();
+
+        Map<Long, Integer> previouslyConfirmedRequests = new HashMap<>();
+        if (event.isRequestModeration()) {
+            previouslyConfirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
+        }
+        log.info("Event private service, updating request by event: previouslyConfirmedRequests={}", previouslyConfirmedRequests);
+
+        int countConfirmed = previouslyConfirmedRequests.getOrDefault(event.getId(), 0);
+        validateParticipantLimitReached(event, countConfirmed);
+        long rest = event.getParticipantLimit() - countConfirmed;
+        if (requests.size() > rest) {
+            requests = requests.stream().limit(rest).toList();
+        }
+        log.info("Event private service, updating request by event: requests to confirm={}", requests);
+
+        List<ParticipantRequestDto> confirmedRequestDtos = updateAndSaveStatusByRequests(requests,
+                ParticipantRequest.Status.CONFIRMED).stream()
+                .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
+                .toList();
+
+        List<ParticipantRequest> requestsToReject = requestRepository.findAllByEventInAndStatus(List.of(event),
+                ParticipantRequest.Status.PENDING);
+        log.info("Event private service, updating request by event: requests to reject={}", requestsToReject);
+
+        List<ParticipantRequestDto> canceledRequestDtos = updateAndSaveStatusByRequests(requestsToReject,
+                ParticipantRequest.Status.REJECTED).stream()
+                .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
+                .toList();
+
+        requestStatusUpdateResult.setRejectedRequests(canceledRequestDtos);
+        requestStatusUpdateResult.setConfirmedRequests(confirmedRequestDtos);
+
+        return requestStatusUpdateResult;
+    }
+
+    private void updateState(UpdateEventUserRequest updateRequest, Event event) {
         if (!updateRequest.hasStateAction()) {
             return;
         }
         UpdateEventUserRequest.StateAction stateAction = updateRequest.getStateAction();
         if (stateAction.equals(UpdateEventUserRequest.StateAction.SEND_TO_REVIEW)) {
-            if (event.getState().equals(Event.State.CANCELED)) {
-                throw new ActionConflictException(String.format("Cannot sent to review canceled event, current state %s",
-                        event.getState()));
-            }
             event.setPublishedOn(null);
+            event.setState(Event.State.PENDING);
         }
         if (stateAction.equals(UpdateEventUserRequest.StateAction.CANCEL_REVIEW)) {
             if (event.getState().equals(Event.State.CANCELED)) {
@@ -231,8 +245,9 @@ public class EventPrivateServiceImpl implements EventPrivateService {
     }
 
     private Category validateCategoryNotFound(long categoryId) {
-        return categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new NotFoundException(String.format("Category with id=%s was not found", categoryId)));
+            return categoryRepository.findById(categoryId)
+                    .orElseThrow(() -> new NotFoundException(String.format("Category with id=%s was not found",
+                            categoryId)));
     }
 
     private Event validateEventNotFound(long eventId) {
@@ -242,8 +257,41 @@ public class EventPrivateServiceImpl implements EventPrivateService {
 
     private void validateInitiator(long initiatorId, long userId, long eventId) {
         if (initiatorId != userId) {
-            throw new ActionConflictException(String.format("User with id %d is not available to change event with id %d",
-                    userId, eventId));
+            throw new ActionConflictException(String.format("Action is available only for initiator of event %d",
+                    eventId));
+        }
+    }
+
+    private void validateEventStateNotPublished(Event event) {
+        if (event.getState().equals(Event.State.PUBLISHED)) {
+            throw new ActionConflictException("Action it not available in state PUBLISHED");
+        }
+    }
+
+    private void validateEventStatePublished(Event event) {
+        if (!event.getState().equals(Event.State.PUBLISHED)) {
+            throw new ActionConflictException(String.format("Action available only in state PUBLISHED. Current state: %d",
+                    event.getId()));
+        }
+    }
+
+    private void validateRequestStatePending(ParticipantRequest request) {
+        if (!request.getStatus().equals(ParticipantRequest.Status.PENDING)) {
+            throw new ActionConflictException(String.format("Request with id %d must have status PENDING. Current status: %s",
+                    request.getId(), request.getStatus()));
+        }
+    }
+
+    private void validateRequestNeedConfirmation(Event event) {
+        if (event.getParticipantLimit() == 0 || !event.isRequestModeration()) {
+            throw new ActionConflictException("Request moderation is not need for event with id " + event.getId());
+        }
+    }
+
+    private void validateParticipantLimitReached(Event event, int countConfirmed) {
+        if (countConfirmed == event.getParticipantLimit()) {
+            throw new ActionConflictException(String.format("The participant limit for event with id %d has been reached",
+                    event.getId()));
         }
     }
 }

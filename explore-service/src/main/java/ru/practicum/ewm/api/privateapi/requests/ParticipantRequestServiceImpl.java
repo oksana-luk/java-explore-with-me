@@ -34,12 +34,22 @@ public class ParticipantRequestServiceImpl implements ParticipantRequestService 
     public ParticipantRequestDto addRequest(long userId, long eventId) {
         User requester = validateUserNotFound(userId);
         Event event = validateEventNotFound(eventId);
+        validateRequesterIsInitiator(requester, event.getInitiator());
+        validateEventStatePublished(event);
+        if (event.getParticipantLimit() > 0) {
+            Map<Long, Integer> confirmedRequests = getCountOfConfirmedRequestsByEvents(List.of(event));
+            log.info("Participant request private service, adding request by event: confirmedRequests={}", confirmedRequests);
+            validateParticipantLimitReached(event, confirmedRequests.getOrDefault(event.getId(), 0));
+        }
+
         ParticipantRequest request = new ParticipantRequest(
                 0L,
                 requester,
                 event,
                 LocalDateTime.now(),
-                ParticipantRequest.Status.PENDING);
+                (!event.isRequestModeration() || event.getParticipantLimit() == 0) ?
+                        ParticipantRequest.Status.CONFIRMED : ParticipantRequest.Status.PENDING);
+        log.info("Participant request private service, adding request: request={}", request);
         request = requestRepository.save(request);
         return requestMapper.mapParticipantRequestToParticipantRequestDto(request);
     }
@@ -57,10 +67,9 @@ public class ParticipantRequestServiceImpl implements ParticipantRequestService 
     public ParticipantRequestDto cancelRequest(long userId, long requestId) {
         User user = validateUserNotFound(userId);
         ParticipantRequest request = validateRequestNotFound(requestId);
-        if (user != request.getRequester()) {
-            throw new ActionConflictException("Action available only for requester.");
-        }
+        validateUserIsRequester(user, request.getRequester());
         request.setStatus(ParticipantRequest.Status.CANCELED);
+        log.info("Participant request private service, canceling request: request={}", request);
         return requestMapper.mapParticipantRequestToParticipantRequestDto(requestRepository.save(request));
     }
 
@@ -79,12 +88,38 @@ public class ParticipantRequestServiceImpl implements ParticipantRequestService 
     }
 
     private Event validateEventNotFound(long eventId) {
-        return eventRepository.findByIdAndState(eventId, Event.State.PUBLISHED).orElseThrow(() ->
+        return eventRepository.findById(eventId).orElseThrow(() ->
                 new NotFoundException(String.format("Event with id %d not found", eventId)));
     }
 
     private ParticipantRequest validateRequestNotFound(long requestId) {
         return requestRepository.findById(requestId).orElseThrow(() ->
                 new NotFoundException(String.format("Participant request with id %d not found", requestId)));
+    }
+
+    private void validateRequesterIsInitiator(User requester, User initiator) {
+        if (requester == initiator) {
+            throw new ActionConflictException("Initiator should not be participant of event");
+        }
+    }
+
+    private void validateUserIsRequester(User user, User requester) {
+        if (user != requester) {
+            throw new ActionConflictException("Action available only for requester.");
+        }
+    }
+
+    private void validateEventStatePublished(Event event) {
+        if (!event.getState().equals(Event.State.PUBLISHED)) {
+            throw new ActionConflictException(String.format("Action available only in state PUBLISHED. Current state: %s",
+                    event.getState()));
+        }
+    }
+
+    private void validateParticipantLimitReached(Event event, int countConfirmed) {
+        if (countConfirmed == event.getParticipantLimit()) {
+            throw new ActionConflictException(String.format("The participant limit for event with id %d has been reached",
+                    event.getId()));
+        }
     }
 }

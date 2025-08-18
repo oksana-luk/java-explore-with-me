@@ -28,10 +28,10 @@ public class StatisticServiceImp implements StatisticService {
 
     @Override
     public Map<Long, Long> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
-        log.info("Statistic service, getting events statistic start={}, end={}, uris={}, unique={}", start, end, uris, unique);
+        log.info("Statistic service, getting events statistic: start={}, end={}, uris={}, unique={}", start, end, uris, unique);
 
         List<StatsDto> statsDtos = client.getStats(start, end, uris, unique);
-        log.info("Statistic service, getting events statistic result={}", statsDtos);
+        log.info("Statistic service, getting events statistic: result={}", statsDtos);
 
         return transformStatistic(statsDtos);
     }
@@ -59,7 +59,7 @@ public class StatisticServiceImp implements StatisticService {
             Long id = Long.parseLong(uri.substring("/events/".length()));
             result.put(id, dto.getHits());
         }
-        log.info("Statistic service, getting events statistic, transformed result={}", result);
+        log.info("Statistic service, getting events statistic: transformed result={}", result);
         return result;
     }
 }

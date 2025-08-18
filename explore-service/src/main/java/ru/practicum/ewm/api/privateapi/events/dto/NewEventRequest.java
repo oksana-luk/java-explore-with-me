@@ -1,10 +1,7 @@
 package ru.practicum.ewm.api.privateapi.events.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -19,7 +16,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class NewEventRequest {
     @NotNull(message = "Category should not be empty")
-    private int category;
+    private long category;
 
     @NotNull(message = "Event date should not be empty")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -39,7 +36,7 @@ public class NewEventRequest {
 
     private boolean requestModeration = true;
 
-    @Positive(message = "Participant limit should be positive")
+    @Min(value = 0, message = "Participant limit should be 0 or more")
     private int participantLimit = 0;
 
     @NotNull(message = "Location should not be empty")

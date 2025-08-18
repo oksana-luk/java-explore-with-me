@@ -10,7 +10,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.api.privateapi.events.dto.*;
 import ru.practicum.ewm.api.privateapi.requests.dto.ParticipantRequestDto;
-import ru.practicum.ewm.exception.ActionConflictException;
+import ru.practicum.ewm.exception.ValidationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,7 +31,7 @@ public class EventPrivateController {
         log.info("POST /users/{userId}/events newEventRequest={}, userId={}", newEventRequest, userId);
         LocalDateTime eventDate = newEventRequest.getEventDate();
         if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-            throw new ActionConflictException(String.format(
+            throw new ValidationException(String.format(
                     "Event date should contain future date, current value: %s", eventDate));
         }
         EventFullDto eventFullDto = eventService.addEvent(newEventRequest, userId);
@@ -69,7 +69,7 @@ public class EventPrivateController {
         log.info("PATCH /users/{userId}/events/{eventId} userId={}, eventId={}, updateRequest={}", userId, eventId, updateRequest);
         LocalDateTime eventDate = updateRequest.getEventDate();
         if (Objects.nonNull(eventDate) && eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
-            throw new ActionConflictException(String.format(
+            throw new ValidationException(String.format(
                     "Event date should contain future date, current value: %s", eventDate));
         }
         EventFullDto eventFullDto = eventService.updateEvent(updateRequest, userId, eventId);
@@ -90,8 +90,8 @@ public class EventPrivateController {
     @PatchMapping("/{eventId}/requests")
     @ResponseStatus(HttpStatus.OK)
     public EventRequestStatusUpdateResult updateEventRequests(@Valid @RequestBody EventRequestStatusUpdateRequest updateRequest,
-                                    @PathVariable long userId,
-                                    @PathVariable long eventId) {
+                                                                @PathVariable long userId,
+                                                                @PathVariable long eventId) {
         log.info("PATCH /users/{userId}/events/{eventId}/requests userId={}, eventId={}, updateRequest={}", userId, eventId, updateRequest);
         EventRequestStatusUpdateResult result = eventService.updateRequestsByEvent(updateRequest, userId, eventId);
         log.info("PATCH /users/{userId}/events/{eventId}/requests result={}", result);

@@ -1,6 +1,7 @@
 package ru.practicum.ewm.api.privateapi.events.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.*;
@@ -30,7 +31,7 @@ public class UpdateEventUserRequest {
 
     private Boolean requestModeration;
 
-    @Positive(message = "Participant limit should be positive")
+    @Min(value = 0, message = "Participant limit should be 0 or more")
     private Integer participantLimit;
 
     private Location location;
@@ -40,7 +41,7 @@ public class UpdateEventUserRequest {
     private StateAction stateAction;
 
     public enum StateAction {
-        SEND_TO_REVIEW, CANCEL_REVIEW;
+        SEND_TO_REVIEW, CANCEL_REVIEW
     }
 
     public boolean hasCategory() {

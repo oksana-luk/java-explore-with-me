@@ -19,7 +19,7 @@ import java.time.format.DateTimeFormatter;
 @Component
 @RequiredArgsConstructor
 public class EventMapper {
-    private final static DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final UserMapper userMapper;
     private final CategoryMapper categoryMapper;
 

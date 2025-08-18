@@ -26,7 +26,7 @@ public class UserServiceImp implements UserService {
     @Transactional
     public UserDto addUser(NewUserRequest newUserRequest) {
         User user = userMapper.mapNewUserRequestToUser(newUserRequest);
-        log.info("User service add user {}", user);
+        log.info("User admin service, adding user: user={}", user);
         user = userRepository.save(user);
         return userMapper.mapUserToUserDto(user);
     }
@@ -34,7 +34,7 @@ public class UserServiceImp implements UserService {
     @Override
     public List<UserDto> getUsers(List<Long> ids, int from, int size) {
         PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size);
-        log.info("User service getting users page {}", page);
+        log.info("User admin service, getting users: page={}", page);
         Page<User> users;
         if (Objects.isNull(ids) || ids.isEmpty()) {
            users = userRepository.findAll(page);
@@ -49,7 +49,7 @@ public class UserServiceImp implements UserService {
     @Transactional
     public void deleteUser(long userId) {
         validateNotFound(userId);
-        log.info("User service deleting user by id {}", userId);
+        log.info("User admin service, deleting user by id: userId={}", userId);
         userRepository.deleteById(userId);
     }
 
