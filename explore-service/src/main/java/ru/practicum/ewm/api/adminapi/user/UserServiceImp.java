@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.api.adminapi.user.dto.NewUserRequest;
@@ -33,7 +34,7 @@ public class UserServiceImp implements UserService {
 
     @Override
     public List<UserDto> getUsers(List<Long> ids, int from, int size) {
-        PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size);
+        PageRequest page = PageRequest.of(from > 0 ? from / size : 0, size, Sort.by("id").ascending());
         log.info("User admin service, getting users: page={}", page);
         Page<User> users;
         if (Objects.isNull(ids) || ids.isEmpty()) {
