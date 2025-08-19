@@ -169,8 +169,8 @@ public class EventPrivateServiceImpl implements EventPrivateService {
     private EventRequestStatusUpdateResult rejectRequests(List<ParticipantRequest> requests) {
         EventRequestStatusUpdateResult requestStatusUpdateResult = new EventRequestStatusUpdateResult();
 
-        List<ParticipantRequestDto> canceledRequestDtos = updateAndSaveStatusByRequests(requests,
-                ParticipantRequest.Status.REJECTED).stream()
+        requests.forEach(request -> request.setStatus(ParticipantRequest.Status.REJECTED));
+        List<ParticipantRequestDto> canceledRequestDtos = requests.stream()
                 .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
                 .toList();
 
@@ -189,25 +189,37 @@ public class EventPrivateServiceImpl implements EventPrivateService {
 
         int countConfirmed = previouslyConfirmedRequests.getOrDefault(event.getId(), 0);
         validateParticipantLimitReached(event, countConfirmed);
-        long rest = event.getParticipantLimit() - countConfirmed;
-        if (requests.size() > rest) {
-            requests = requests.stream().limit(rest).toList();
+
+        long restOfParticipantLimit = event.getParticipantLimit() - countConfirmed;
+        boolean rejectTheRestOfRequests = true;
+        if (event.getParticipantLimit() == 0 || restOfParticipantLimit > requests.size()) {
+            rejectTheRestOfRequests = false;
+        } else {
+            requests = requests.stream().limit(restOfParticipantLimit).toList();
         }
+
         log.info("Event private service, updating request by event: requests to confirm={}", requests);
 
-        List<ParticipantRequestDto> confirmedRequestDtos = updateAndSaveStatusByRequests(requests,
-                ParticipantRequest.Status.CONFIRMED).stream()
+        requests.forEach(request -> request.setStatus(ParticipantRequest.Status.CONFIRMED));
+        requests = requestRepository.saveAll(requests);
+
+        List<ParticipantRequestDto> confirmedRequestDtos = requests.stream()
                 .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
                 .toList();
 
-        List<ParticipantRequest> requestsToReject = requestRepository.findAllByEventInAndStatus(List.of(event),
-                ParticipantRequest.Status.PENDING);
-        log.info("Event private service, updating request by event: requests to reject={}", requestsToReject);
+        List<ParticipantRequestDto> canceledRequestDtos = new ArrayList<>();
+        if (rejectTheRestOfRequests) {
+            List<ParticipantRequest> requestsToReject = requestRepository.findAllByEventInAndStatus(List.of(event),
+                    ParticipantRequest.Status.PENDING);
+            log.info("Event private service, updating request by event: requests to reject={}", requestsToReject);
 
-        List<ParticipantRequestDto> canceledRequestDtos = updateAndSaveStatusByRequests(requestsToReject,
-                ParticipantRequest.Status.REJECTED).stream()
-                .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
-                .toList();
+            requestsToReject.forEach(request -> request.setStatus(ParticipantRequest.Status.REJECTED));
+            requestsToReject = requestRepository.saveAll(requestsToReject);
+
+            canceledRequestDtos = requestsToReject.stream()
+                    .map(requestMapper::mapParticipantRequestToParticipantRequestDto)
+                    .toList();
+        }
 
         requestStatusUpdateResult.setRejectedRequests(canceledRequestDtos);
         requestStatusUpdateResult.setConfirmedRequests(confirmedRequestDtos);
@@ -232,11 +244,6 @@ public class EventPrivateServiceImpl implements EventPrivateService {
             event.setState(Event.State.CANCELED);
             event.setPublishedOn(null);
         }
-    }
-
-    private List<ParticipantRequest> updateAndSaveStatusByRequests(List<ParticipantRequest> requests, ParticipantRequest.Status status) {
-        requests.forEach(request -> request.setStatus(status));
-        return requestRepository.saveAll(requests);
     }
 
     private User validateUserNotFound(long userId) {

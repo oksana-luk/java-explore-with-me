@@ -21,6 +21,7 @@ logging.level.org.hibernate:
 spring.datasource:
   driver-class-name: org.postgresql.Driver
   url: jdbc:postgresql://ewm-db:5432/ewm
+#  url: jdbc:postgresql://localhost:5432/ewm
   username: ewm
   password: 12345
 
