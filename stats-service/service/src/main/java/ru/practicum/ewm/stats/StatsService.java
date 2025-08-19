@@ -1,11 +1,11 @@
 package ru.practicum.ewm.stats;
 
-import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.HitDto;
 import ru.practicum.ewm.StatsDto;
+import ru.practicum.ewm.exception.ValidationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
