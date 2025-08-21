@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.ewm.api.adminapi.events.dto.UpdateEventAdminRequest;
+import ru.practicum.ewm.api.adminapi.moderations.ModerationService;
+import ru.practicum.ewm.api.adminapi.moderations.dto.ModerationDto;
 import ru.practicum.ewm.api.privateapi.events.dto.EventFullDto;
 import ru.practicum.ewm.api.privateapi.events.model.Event;
 import ru.practicum.ewm.exception.ValidationException;
@@ -25,6 +27,7 @@ import java.util.Objects;
 @RequestMapping("/admin/events")
 public class EventAdminController {
     private final EventAdminService eventAdminService;
+    private final ModerationService moderationService;
 
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
@@ -57,5 +60,14 @@ public class EventAdminController {
         EventFullDto eventFullDto = eventAdminService.updateEvent(updateEventAdminRequest, eventId);
         log.info("PATCH /admin/events/{eventId} result={}", eventFullDto);
         return eventFullDto;
+    }
+
+    @GetMapping("/{eventId}/moderation")
+    @ResponseStatus(HttpStatus.OK)
+    public List<ModerationDto> getEventModerationHistory(@PathVariable long eventId) {
+        log.info("GET /admin/events/{eventId}/moderation eventId={}", eventId);
+        List<ModerationDto> moderationDtos = moderationService.getModerationHistory(eventId);
+        log.info("GET /admin/events/{eventId}/moderation result={}", moderationDtos);
+        return moderationDtos;
     }
 }

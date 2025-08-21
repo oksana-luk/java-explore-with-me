@@ -42,6 +42,10 @@ public class EventMapper {
     }
 
     public EventFullDto mapEventToEventFullDto(Event event, int confirmedRequests, long views) {
+        return mapEventToEventFullDto(event, confirmedRequests, views, null);
+    }
+
+    public EventFullDto mapEventToEventFullDto(Event event, int confirmedRequests, long views, String moderationComment) {
         return new EventFullDto(
                 event.getId(),
                 userMapper.mapUserToUserShortDto(event.getInitiator()),
@@ -58,7 +62,8 @@ public class EventMapper {
                 event.isPaid(),
                 event.getState(),
                 confirmedRequests,
-                views);
+                views,
+                moderationComment);
     }
 
     public EventShortDto mapEventToEventShortDto(Event event, int confirmedRequests, long views) {

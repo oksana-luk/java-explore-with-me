@@ -58,6 +58,6 @@ public class Event {
     private State state;
 
     public enum State {
-        PENDING, PUBLISHED, CANCELED;
+        PENDING, PUBLISHED, CANCELED, FIX_NEED, REJECTED
     }
 }

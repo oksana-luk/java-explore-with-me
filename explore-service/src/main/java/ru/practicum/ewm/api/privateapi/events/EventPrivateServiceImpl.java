@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.api.adminapi.categories.CategoryRepository;
 import ru.practicum.ewm.api.adminapi.categories.model.Category;
+import ru.practicum.ewm.api.adminapi.moderations.ModerationService;
 import ru.practicum.ewm.api.adminapi.user.UserRepository;
 import ru.practicum.ewm.api.adminapi.user.model.User;
 import ru.practicum.ewm.api.privateapi.events.dto.*;
@@ -35,6 +36,7 @@ public class EventPrivateServiceImpl implements EventPrivateService {
     private final ParticipantRequestService requestService;
     private final ParticipantRequestRepository requestRepository;
     private final ParticipantRequestMapper requestMapper;
+    private final ModerationService moderationService;
     private final EventMapper eventMapper;
 
     @Override
@@ -83,8 +85,9 @@ public class EventPrivateServiceImpl implements EventPrivateService {
 
     @Override
     public EventFullDto getEvent(long userId, long eventId) {
-        Event event = eventRepository.findById(eventId).orElseThrow(() ->
-                new NotFoundException(String.format("Event with id %d not found", eventId)));
+        Event event = validateEventNotFound(eventId);
+        validateUserNotFound(userId);
+        validateInitiator(event.getInitiator().getId(), userId, eventId);
         log.info("Event private service, getting event by id: eventId={}", eventId);
 
         Map<Long, Long> statistic = statisticService.getStatsByEvents(List.of(event), false);
@@ -92,12 +95,18 @@ public class EventPrivateServiceImpl implements EventPrivateService {
         if (event.isRequestModeration()) {
             confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
         }
-        log.info("Event private service, getting event by id: statistic={}, confirmedRequests={}", statistic, confirmedRequests);
+        Map<Long, String> moderationComments = new HashMap<>();
+        if (event.getState().equals(Event.State.FIX_NEED) || event.getState().equals(Event.State.REJECTED)) {
+            moderationComments = moderationService.getLatestModerationsComments(List.of(event));
+        }
+        log.info("Event private service, getting event by id: statistic={}, confirmedRequests={}, moderationComments={}",
+                statistic, confirmedRequests, moderationComments);
 
         return eventMapper.mapEventToEventFullDto(
                 event,
                 confirmedRequests.getOrDefault(event.getId(), 0),
-                statistic.getOrDefault(event.getId(), 0L));
+                statistic.getOrDefault(event.getId(), 0L),
+                moderationComments.getOrDefault(event.getId(), null));
     }
 
     @Override
@@ -123,11 +132,17 @@ public class EventPrivateServiceImpl implements EventPrivateService {
         if (event.isRequestModeration()) {
             confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(List.of(event));
         }
-        log.info("Event private service, updating event: statistic={}, confirmedRequests={}", statistic, confirmedRequests);
+        Map<Long, String> moderationComments = new HashMap<>();
+        if (event.getState().equals(Event.State.FIX_NEED) || event.getState().equals(Event.State.REJECTED)) {
+            moderationComments = moderationService.getLatestModerationsComments(List.of(event));
+        }
+        log.info("Event private service, updating event: statistic={}, confirmedRequests={}, moderationComments={}",
+                statistic, confirmedRequests, moderationComments);
 
         return eventMapper.mapEventToEventFullDto(event,
                 confirmedRequests.getOrDefault(event.getId(), 0),
-                statistic.getOrDefault(event.getId(), 0L));
+                statistic.getOrDefault(event.getId(), 0L),
+                moderationComments.getOrDefault(event.getId(), null));
     }
 
     @Override
@@ -272,6 +287,12 @@ public class EventPrivateServiceImpl implements EventPrivateService {
     private void validateEventStateNotPublished(Event event) {
         if (event.getState().equals(Event.State.PUBLISHED)) {
             throw new ActionConflictException("Action it not available in state PUBLISHED");
+        }
+    }
+
+    private void validateEventStateNotRejected(Event event) {
+        if (event.getState().equals(Event.State.REJECTED)) {
+            throw new ActionConflictException("Action it not available in state REJECTED");
         }
     }
 
