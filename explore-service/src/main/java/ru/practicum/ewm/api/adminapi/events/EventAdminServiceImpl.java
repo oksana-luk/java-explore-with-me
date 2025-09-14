@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.api.adminapi.categories.CategoryRepository;
 import ru.practicum.ewm.api.adminapi.categories.model.Category;
 import ru.practicum.ewm.api.adminapi.events.dto.UpdateEventAdminRequest;
+import ru.practicum.ewm.api.adminapi.moderations.ModerationService;
 import ru.practicum.ewm.api.privateapi.events.EventMapper;
 import ru.practicum.ewm.api.privateapi.events.EventRepository;
 import ru.practicum.ewm.api.privateapi.events.dto.EventFullDto;
@@ -35,6 +36,7 @@ public class EventAdminServiceImpl implements EventAdminService {
     private final StatisticService statisticService;
     private final ParticipantRequestService requestService;
     private final EventMapper eventMapper;
+    private final ModerationService moderationService;
 
     @Override
     public List<EventFullDto> getEvents(List<Long> users, List<Event.State> states, List<Long> categories,
@@ -49,13 +51,16 @@ public class EventAdminServiceImpl implements EventAdminService {
 
         Map<Long, Long> statistic = statisticService.getStatsByEvents(events, false);
         Map<Long, Integer> confirmedRequests = requestService.getCountOfConfirmedRequestsByEvents(events);
-        log.info("Event admin service, getting events statistic={}, confirmedRequests={}", statistic, confirmedRequests);
+        Map<Long, String> moderationComments = moderationService.getLatestModerationsComments(events);
+        log.info("Event admin service, getting events statistic={}, confirmedRequests={}, moderationComments={}",
+                statistic, confirmedRequests, moderationComments);
 
         return events.stream()
                 .map(event -> eventMapper.mapEventToEventFullDto(
                         event,
                         confirmedRequests.getOrDefault(event.getId(), 0),
-                        statistic.getOrDefault(event.getId(), 0L)))
+                        statistic.getOrDefault(event.getId(), 0L),
+                        moderationComments.getOrDefault(event.getId(), null)))
                 .toList();
     }
 
@@ -82,9 +87,16 @@ public class EventAdminServiceImpl implements EventAdminService {
         }
         log.info("Event admin service, updating event: statistic={}, confirmedRequests={}", statistic, confirmedRequests);
 
+        String moderationComment = null;
+        if (event.getState().equals(Event.State.FIX_NEED) || event.getState().equals(Event.State.REJECTED)) {
+            moderationComment = updateRequest.getComment();
+        }
+        moderationService.addModeration(event, null, event.getState(), moderationComment);
+
         return eventMapper.mapEventToEventFullDto(event,
                 confirmedRequests.getOrDefault(event.getId(), 0),
-                statistic.getOrDefault(event.getId(), 0L));
+                statistic.getOrDefault(event.getId(), 0L),
+                moderationComment);
     }
 
     private Specification<Event> getEventSpecification(List<Long> users, List<Event.State> states, List<Long> categories,
@@ -136,7 +148,12 @@ public class EventAdminServiceImpl implements EventAdminService {
         }
         if (stateAction.equals(UpdateEventAdminRequest.StateAction.REJECT_EVENT)) {
             validateEventStatePending(event);
-            event.setState(Event.State.CANCELED);
+            event.setState(Event.State.REJECTED);
+            event.setPublishedOn(null);
+        }
+        if (stateAction.equals(UpdateEventAdminRequest.StateAction.FIX_EVENT)) {
+            validateEventStatePending(event);
+            event.setState(Event.State.FIX_NEED);
             event.setPublishedOn(null);
         }
     }

@@ -42,8 +42,11 @@ public class UpdateEventAdminRequest {
 
     private UpdateEventAdminRequest.StateAction stateAction;
 
+    @Size(min = 5, max = 2000, message = "Comment should contain from 5 to 2000 characters")
+    private String comment;
+
     public enum StateAction {
-        PUBLISH_EVENT, REJECT_EVENT
+        PUBLISH_EVENT, FIX_EVENT, REJECT_EVENT
     }
 
     public boolean hasCategory() {
@@ -84,5 +87,9 @@ public class UpdateEventAdminRequest {
 
     public boolean hasStateAction() {
         return stateAction != null;
+    }
+
+    public boolean hasComment() {
+        return ! (comment == null || comment.isBlank());
     }
 }

@@ -29,4 +29,5 @@ public class EventFullDto {
     private Event.State state;
     private int confirmedRequests;
     private long views;
+    private String moderationComment;
 }
