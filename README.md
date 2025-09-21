@@ -7,7 +7,7 @@ Backend for posting events and submitting applications for participation. API of
 ## Database description
 This store is designed as two PostgreSQL databases to store information about user, event, requests of participation, statistic of views. There are eight tables, three of them with indexes.
 
-![ER-диаграмма](./Diagtam DB ewm.png)
+![ER-диаграмма](./Diagram_DB_ewm.png)
 
 ## Database location
 Both of databases are in the docker containers, that will be created using docker compose file.
